@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../models/home_data.dart';
+import '../../domain/entities/home_feed.dart';
 import '../theme/app_colors.dart';
 
 // Un serviciu medical (iconita SVG din retea + denumire)

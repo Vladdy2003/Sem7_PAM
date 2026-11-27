@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/appointment_details.dart';
+import '../../domain/entities/doctor.dart';
+import '../../domain/usecases/get_appointment_details.dart';
 import '../cubits/appointment/appointment_cubit.dart';
+import '../cubits/appointment/appointment_details_cubit.dart';
 import '../cubits/home/home_cubit.dart';
-import '../models/appointment_details.dart';
 import '../theme/app_colors.dart';
 import '../widgets/avatar_image.dart';
 import '../widgets/contact_button.dart';
@@ -11,21 +14,73 @@ import '../widgets/favorite_button.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/section_header.dart';
 import '../widgets/slot_selector.dart';
+import '../widgets/state_views.dart';
 
-// Pagina de detalii / programare. Primeste datele deja incarcate din JSON.
-// doctorId != null => doctorul provine din lista "Nearby" si poate fi
+// Pagina de detalii / programare.
+// La deschidere cere detaliile de la server prin AppointmentDetailsCubit
+// (use case GetAppointmentDetails) si arata Loading / Error / continutul.
+// doctor != null => doctorul provine din lista "Nearby" si poate fi
 // adaugat/eliminat din favorite (starea este partajata cu HomeCubit).
 class AppointmentScreen extends StatelessWidget {
-  final AppointmentDetails details;
-  final String? doctorId;
+  final Doctor? doctor;
 
-  const AppointmentScreen({super.key, required this.details, this.doctorId});
+  const AppointmentScreen({super.key, this.doctor});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AppointmentCubit(details),
-      child: _AppointmentView(details: details, doctorId: doctorId),
+      create: (context) => AppointmentDetailsCubit(
+        context.read<GetAppointmentDetails>(),
+        doctor: doctor,
+      )..load(),
+      child: BlocBuilder<AppointmentDetailsCubit, AppointmentDetailsState>(
+        builder: (context, state) => switch (state) {
+          AppointmentDetailsLoading() => const _StatusScaffold(
+              child: LoadingView(message: 'Loading appointment details...'),
+            ),
+          AppointmentDetailsError(:final message) => _StatusScaffold(
+              child: ErrorView(
+                message: message,
+                onRetry: () => context.read<AppointmentDetailsCubit>().load(),
+              ),
+            ),
+          AppointmentDetailsLoaded(:final details) => BlocProvider(
+              create: (_) => AppointmentCubit(details),
+              child: _AppointmentView(details: details, doctorId: doctor?.id),
+            ),
+        },
+      ),
+    );
+  }
+}
+
+// Scaffold simplu cu buton "inapoi", folosit pentru Loading / Error
+class _StatusScaffold extends StatelessWidget {
+  final Widget child;
+  const _StatusScaffold({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 22),
+                  color: AppColors.textDark,
+                  onPressed: () => Navigator.maybePop(context),
+                ),
+              ),
+            ),
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 }

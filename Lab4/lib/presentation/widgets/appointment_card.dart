@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/home_data.dart';
+import '../../domain/entities/home_feed.dart';
 import '../theme/app_colors.dart';
 import 'avatar_image.dart';
 

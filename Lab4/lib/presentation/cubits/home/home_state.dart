@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
-import '../../models/app_data.dart';
-import '../../models/doctor.dart';
+import '../../../domain/entities/home_feed.dart';
+import '../../../domain/entities/doctor.dart';
 
 // Optiunile de sortare pentru lista de doctori
 enum DoctorSort {
@@ -41,7 +41,7 @@ final class HomeError extends HomeState {
 // Stare comuna pentru Success si Empty: datele sunt incarcate,
 // iar filtrele curente (cautare, specialitate, sortare, favorite) sunt pastrate.
 sealed class HomeReady extends HomeState {
-  final AppData data;
+  final HomeFeed feed;
   final List<Doctor> visibleDoctors;
   final List<String> specialties;
   final String query;
@@ -51,7 +51,7 @@ sealed class HomeReady extends HomeState {
   final int favoritesCount;
 
   const HomeReady({
-    required this.data,
+    required this.feed,
     required this.visibleDoctors,
     required this.specialties,
     required this.query,
@@ -69,7 +69,7 @@ sealed class HomeReady extends HomeState {
 
   @override
   List<Object?> get props => [
-        data,
+        feed,
         visibleDoctors,
         specialties,
         query,
@@ -82,7 +82,7 @@ sealed class HomeReady extends HomeState {
 
 final class HomeSuccess extends HomeReady {
   const HomeSuccess({
-    required super.data,
+    required super.feed,
     required super.visibleDoctors,
     required super.specialties,
     required super.query,
@@ -93,10 +93,10 @@ final class HomeSuccess extends HomeReady {
   });
 }
 
-// Nu exista niciun doctor pentru filtrele curente (sau lista din JSON e goala)
+// Nu exista niciun doctor pentru filtrele curente (sau lista primita de la server e goala)
 final class HomeEmpty extends HomeReady {
   const HomeEmpty({
-    required super.data,
+    required super.feed,
     required super.specialties,
     required super.query,
     required super.specialty,

@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../cubits/home/home_cubit.dart';
-import '../models/appointment_details.dart';
-import '../models/doctor.dart';
-import '../models/home_data.dart';
+import '../../domain/entities/doctor.dart';
+import '../../domain/entities/home_feed.dart';
 import '../theme/app_colors.dart';
 import '../widgets/appointment_card.dart';
 import '../widgets/avatar_image.dart';
@@ -41,23 +40,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openAppointment(AppointmentDetails details, {Doctor? doctor}) {
+  // Ecranul de programare isi incarca singur detaliile (GET /feed/details).
+  // doctor != null => detaliile sunt personalizate pentru doctorul ales.
+  void _openAppointment({Doctor? doctor}) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AppointmentScreen(details: details, doctorId: doctor?.id),
-      ),
+      MaterialPageRoute(builder: (_) => AppointmentScreen(doctor: doctor)),
     );
-  }
-
-  void _openDoctor(HomeReady state, Doctor doctor) {
-    final template = state.data.appointmentDetails;
-    final details = template.forDoctor(template.doctor.copyWith(
-      name: doctor.name,
-      clinic: doctor.specialty,
-      avatarUrl: doctor.avatarUrl,
-    ));
-    _openAppointment(details, doctor: doctor);
   }
 
   @override
@@ -90,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildContent(BuildContext context, HomeReady state) {
     final cubit = context.read<HomeCubit>();
-    final home = state.data.home;
+    final home = state.feed;
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -110,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 22),
           AppointmentCard(
             appointment: home.appointment,
-            onTap: () => _openAppointment(state.data.appointmentDetails),
+            onTap: () => _openAppointment(),
           ),
           const SizedBox(height: 26),
           const SectionHeader(title: 'Health Services'),
@@ -172,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
             DoctorTile(
               key: ValueKey(doctor.id),
               doctor: doctor,
-              onTap: () => _openDoctor(state, doctor),
+              onTap: () => _openAppointment(doctor: doctor),
               onFavoriteTap: () => cubit.toggleFavorite(doctor.id),
             ),
         ],

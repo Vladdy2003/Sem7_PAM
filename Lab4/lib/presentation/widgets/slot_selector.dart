@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/appointment_details.dart';
+import '../../domain/entities/appointment_details.dart';
 import '../theme/app_colors.dart';
 
 // Lista orizontala de sloturi selectabile (ore / zile)

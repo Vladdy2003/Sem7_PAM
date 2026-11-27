@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../models/appointment_details.dart';
+import '../../../domain/entities/appointment_details.dart';
 
 enum BookingStatus { idle, booking, success, failure }
 

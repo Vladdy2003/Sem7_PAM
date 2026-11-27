@@ -1,47 +1,101 @@
-# Laborator 3 – Health App (Flutter + Cubit)
+# Laborator 4 – Health App (Flutter + REST API + Clean Architecture)
 
-Extinderea aplicatiei din Lab 2 cu **State Management (flutter_bloc / Cubit)**,
-**programare asincrona** si date incarcate dintr-un **fisier JSON**.
+Acelasi design ca in laboratoarele anterioare, dar datele vin de la un
+serviciu Web REST (HTTP + JSON), iar codul este organizat dupa
+**Clean Architecture**: Presentation → Domain ← Data.
+
+API folosit:
+
+| Endpoint | Ecran |
+|---|---|
+| `GET https://test-api-jlbn.onrender.com/lab2026/v2/feed` | ecranul principal |
+| `GET https://test-api-jlbn.onrender.com/lab2026/v2/feed/details` | ecranul de programare |
 
 ## Structura proiectului
 
 ```
-assets/data/lab.json            datele aplicatiei (incarcate asincron)
 lib/
-  main.dart                     RepositoryProvider + BlocProvider(HomeCubit)
-  models/                       modele de date cu fromJson (Equatable)
-    app_data.dart, home_data.dart, doctor.dart, appointment_details.dart
-  data/health_repository.dart   HealthRepository (abstract) + JsonHealthRepository
-  cubits/
-    home/home_cubit.dart        incarcare, cautare, filtrare, sortare, favorite
-    home/home_state.dart        Initial / Loading / Success / Empty / Error
-    appointment/appointment_cubit.dart   selectie ora/data + rezervare async
-  screens/
-    home_screen.dart            ecranul principal (lista de doctori)
-    appointment_screen.dart     pagina de detalii / programare
-  widgets/                      componente UI reutilizabile
-    avatar_image, appointment_card, doctor_tile, favorite_button,
-    filter_chips_bar, health_service_item, search_field, section_header,
-    slot_selector, primary_button, contact_button, sort_filter_sheet,
-    state_views (LoadingView, ErrorView, EmptyView)
-  theme/app_colors.dart
-test/widget_test.dart           teste pentru HomeCubit si pentru UI
+  main.dart                       pornirea aplicatiei, furnizeaza use case-urile + HomeCubit
+  injection_container.dart        DI: http.Client -> DataSource -> RepositoryImpl
+
+  core/                           cod comun, folosit de toate straturile
+    network/api_config.dart       baseUrl, endpoint-uri, timeout
+    error/exceptions.dart         ServerException, NetworkException, ParsingException (Data)
+    error/failures.dart           ServerFailure, NetworkFailure, ParsingFailure (Domain/UI)
+    result.dart                   Result<T> = ResultSuccess | ResultFailure
+    usecase/usecase.dart          contractul UseCase<T, Params>
+
+  domain/                         logica de business, fara Flutter / HTTP / JSON
+    entities/                     Doctor, HomeFeed (+UserProfile, HealthService...),
+                                  AppointmentDetails (+Payment, SlotGroup...)
+    repositories/health_repository.dart   interfata (contractul) repository-ului
+    usecases/get_home_feed.dart           GetHomeFeed
+    usecases/get_appointment_details.dart GetAppointmentDetails
+
+  data/                           accesul la date (REST API)
+    datasources/health_remote_data_source.dart  cererile HTTP GET + jsonDecode
+    models/                       DTO-uri: fromJson (deserializare), toJson
+                                  (serializare), toEntity (conversie spre Domain)
+    repositories/health_repository_impl.dart    DTO -> entitate, exceptie -> Failure
+
+  presentation/                   interfata utilizatorului
+    cubits/home/                  HomeCubit + stari (Loading/Success/Empty/Error)
+    cubits/appointment/           AppointmentDetailsCubit (Loading/Loaded/Error)
+                                  AppointmentCubit (selectie ora/data + rezervare)
+    screens/                      home_screen.dart, appointment_screen.dart
+    widgets/                      componente UI reutilizabile (DoctorTile, SlotSelector,
+                                  LoadingView / ErrorView / EmptyView ...)
+    theme/app_colors.dart
+
+test/
+  fixtures/                       copii ale raspunsurilor API (doar pentru teste)
+  helpers.dart                    MockClient + repository-uri false
+  data_layer_test.dart            JSON <-> model, mapare erori -> Failure
+  widget_test.dart                HomeCubit + UI (Loading/Success/Empty/Error)
 ```
+
+### Regula dependentelor
+
+- `domain` nu importa nimic din `data` sau `presentation` (nici Flutter, nici `http`).
+- `presentation` foloseste doar `domain` (use case-uri si entitati), nu stie de HTTP.
+- `data` implementeaza interfata din `domain`.
+
+## Fluxul datelor (UI → server → UI)
+
+```
+HomeScreen ── HomeCubit.loadData() ── emit(HomeLoading)
+                │
+                ▼
+        GetHomeFeed()                         (Domain – use case)
+                │
+                ▼
+        HealthRepository.getHomeFeed()        (Domain – interfata)
+                │  implementat de
+                ▼
+        HealthRepositoryImpl                  (Data)
+                │
+                ▼
+        HealthRemoteDataSourceImpl            (Data)
+          GET /feed  →  status 200?  →  jsonDecode  →  HomeFeedModel.fromJson
+                │
+                ▼
+        HomeFeedModel.toEntity()  →  ResultSuccess(HomeFeed)
+           (sau exceptie  →  ResultFailure(ServerFailure/NetworkFailure/ParsingFailure))
+                │
+                ▼
+        HomeCubit: emit(HomeSuccess / HomeEmpty / HomeError)  →  HomeScreen se redeseneaza
+```
+
+Ecranul de programare urmeaza acelasi drum cu `GetAppointmentDetails` si
+`GET /feed/details`, cu propriile stari Loading / Loaded / Error.
 
 ## Functionalitati
 
-- **Incarcare asincrona**: `rootBundle.loadString` + `jsonDecode` (cu o intarziere
-  simulata de 1.2 s ca sa se vada starea Loading). Pull-to-refresh reincarca datele.
-- **Stari**: Loading (spinner), Success (lista), Empty (nimic gasit / lista goala),
-  Error (mesaj + buton „Try again”).
-- **Cautare** dupa nume, specialitate sau adresa.
-- **Filtrare** dupa specialitate (chip-uri sau apasand un „Health Service”)
-  si „Favorites only”.
-- **Sortare**: Default, Name A-Z, Name Z-A, Nearest first (distanta extrasa din text).
-- **Favorite**: inimioara in lista si pe pagina de detalii; starea este comuna
-  (HomeCubit e furnizat deasupra `MaterialApp`).
-- **Navigare la detalii**: cardul „Appointment” sau orice doctor din lista.
-  Pe pagina de detalii: selectie ora/data si rezervare asincrona (loader + SnackBar).
+- **Operatii asincrone**: cereri HTTP cu `async/await`, timeout 60 s (serverul de pe
+  Render porneste greu la prima cerere). Pull-to-refresh reincarca datele.
+- **Stari**: Loading (spinner), Success, Empty, Error (mesaj + „Try again”) pe ambele ecrane.
+- **Cautare, filtrare, sortare, favorite**: locale, in `HomeCubit`, fara cereri noi.
+- **Rezervare**: selectie ora/data si rezervare simulata (loader + SnackBar).
 
 ## Rulare
 
@@ -50,3 +104,6 @@ flutter pub get
 flutter run
 flutter test
 ```
+
+Pe web, browserul blocheaza cererile (API-ul nu trimite antete CORS);
+pe Android/iOS functioneaza normal.

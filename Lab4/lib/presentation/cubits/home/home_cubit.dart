@@ -1,36 +1,40 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/health_repository.dart';
-import '../../models/app_data.dart';
-import '../../models/doctor.dart';
+import '../../../domain/entities/doctor.dart';
+import '../../../domain/entities/home_feed.dart';
+import '../../../domain/usecases/get_home_feed.dart';
 import 'home_state.dart';
 
 export 'home_state.dart';
 
-// Gestioneaza datele ecranului principal: incarcarea asincrona din JSON,
-// cautarea, filtrarea dupa specialitate, sortarea si favoritele.
+// Presentation: gestioneaza starea ecranului principal.
+// Datele vin prin use case-ul GetHomeFeed (Domain) -> repository -> API.
+// Cautarea, filtrarea, sortarea si favoritele se fac local, fara cereri noi.
 class HomeCubit extends Cubit<HomeState> {
-  final HealthRepository _repository;
+  final GetHomeFeed _getHomeFeed;
 
-  AppData? _data;
+  HomeFeed? _feed;
   List<Doctor> _doctors = const [];
   String _query = '';
   String? _specialty;
   DoctorSort _sort = DoctorSort.none;
   bool _favoritesOnly = false;
 
-  HomeCubit(this._repository) : super(const HomeInitial());
+  HomeCubit(this._getHomeFeed) : super(const HomeInitial());
 
   Future<void> loadData() async {
     emit(const HomeLoading());
-    try {
-      final data = await _repository.loadAppData();
-      _data = data;
-      _doctors = List.of(data.home.nearbyDoctors);
-      _emitReady();
-    } catch (e) {
-      emit(HomeError('Could not load data.\n$e'));
-    }
+    final result = await _getHomeFeed();
+    if (isClosed) return;
+    result.fold(
+      onSuccess: (feed) {
+        _feed = feed;
+        _doctors = List.of(feed.nearbyDoctors);
+        _emitReady();
+      },
+      onFailure: (failure) =>
+          emit(HomeError('Could not load data.\n${failure.message}')),
+    );
   }
 
   void search(String query) {
@@ -78,8 +82,8 @@ class HomeCubit extends Cubit<HomeState> {
 
   // Aplica cautarea + filtrele + sortarea si emite Success sau Empty
   void _emitReady() {
-    final data = _data;
-    if (data == null) return;
+    final feed = _feed;
+    if (feed == null) return;
 
     final q = _query.toLowerCase();
     final visible = _doctors.where((d) {
@@ -109,7 +113,7 @@ class HomeCubit extends Cubit<HomeState> {
 
     if (visible.isEmpty) {
       emit(HomeEmpty(
-        data: data,
+        feed: feed,
         specialties: specialties,
         query: _query,
         specialty: _specialty,
@@ -119,7 +123,7 @@ class HomeCubit extends Cubit<HomeState> {
       ));
     } else {
       emit(HomeSuccess(
-        data: data,
+        feed: feed,
         visibleDoctors: visible,
         specialties: specialties,
         query: _query,

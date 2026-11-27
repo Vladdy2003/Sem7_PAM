@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/doctor.dart';
+import '../../domain/entities/doctor.dart';
 import '../theme/app_colors.dart';
 import 'avatar_image.dart';
 import 'favorite_button.dart';

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
-// Un doctor din lista "nearbyDoctors"
+// Entitate Domain: un doctor din lista "Nearby Doctor".
+// Nu stie nimic despre JSON sau HTTP (asta e treaba stratului Data).
 class Doctor extends Equatable {
   final String id;
   final String name;
@@ -17,15 +18,6 @@ class Doctor extends Equatable {
     required this.avatarUrl,
     this.isFavorite = false,
   });
-
-  factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
-        id: json['id'] as String,
-        name: json['name'] as String? ?? '',
-        specialty: json['specialty'] as String? ?? '',
-        distance: json['distance'] as String? ?? '',
-        avatarUrl: json['avatarUrl'] as String? ?? '',
-        isFavorite: json['isFavorite'] as bool? ?? false,
-      );
 
   /// Distanta in metri extrasa din text ("... - 500M from you" -> 500).
   /// Folosita la sortarea dupa distanta.
